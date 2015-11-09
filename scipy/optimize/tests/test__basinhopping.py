@@ -171,6 +171,19 @@ class TestBasinHopping(TestCase):
         assert_(res.nfev > 0)
         assert_equal(res.nfev, res.njev)
 
+    def test_jac(self):
+        # test jacobian returned
+        i = 1
+        minimizer_kwargs = self.kwargs.copy()
+        # L-BFGS-B doesn't return a Jacobian, but BFGS does
+        minimizer_kwargs["method"] = "BFGS"
+
+        res = basinhopping(func2d, self.x0[i],
+                           minimizer_kwargs=minimizer_kwargs, niter=self.niter,
+                           disp=self.disp)
+
+        assert_(hasattr(res, "jac"))
+
     def test_2d_nograd(self):
         # test 2d minimizations without gradient
         i = 1

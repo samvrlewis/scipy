@@ -82,6 +82,10 @@ class BasinHoppingRunner(object):
         # initialize storage class
         self.storage = Storage(self.x, self.energy)
 
+        if hasattr(minres, "jac"):
+            self.res.jac = minres.jac
+        if hasattr(minres, "hess"):
+            self.res.hess = minres.hess
         if hasattr(minres, "nfev"):
             self.res.nfev = minres.nfev
         if hasattr(minres, "njev"):
@@ -114,6 +118,10 @@ class BasinHoppingRunner(object):
             self.res.njev += minres.njev
         if hasattr(minres, "nhev"):
             self.res.nhev += minres.nhev
+        if hasattr(minres, "jac"):
+            self.res.jac = minres.jac
+        if hasattr(minres, "hess"):
+            self.res.hess = minres.hess
 
         # accept the move based on self.accept_tests. If any test is false,
         # than reject the step.  If any test returns the special value, the
