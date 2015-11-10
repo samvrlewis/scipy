@@ -15,22 +15,33 @@ class Storage(object):
     """
     Class used to store the lowest energy structure
     """
-    def __init__(self, x, f):
-        self._add(x, f)
+    def __init__(self, x, f, jac=None, hess=None):
+        # Not all minimizers return a jacobian/hessian, so initialize them both
+        # to None in the case that the minimizer doesn't return them
+        self.jac = None
+        self.hess = None
+        
+        self._add(x, f, jac, hess)
 
-    def _add(self, x, f):
+    def _add(self, x, f, jac, hess):
         self.x = np.copy(x)
         self.f = f
 
-    def update(self, x, f):
+        if jac is not None:
+            self.jac = np.copy(jac)
+
+        if hess is not None:
+            self.hess = np.copy(hess)
+
+    def update(self, x, f, jac=None, hess=None):
         if f < self.f:
-            self._add(x, f)
+            self._add(x, f, jac, hess)
             return True
         else:
             return False
 
     def get_lowest(self):
-        return self.x, self.f
+        return self.x, self.f, self.jac, self.hess
 
 
 class BasinHoppingRunner(object):
@@ -79,13 +90,17 @@ class BasinHoppingRunner(object):
         if self.disp:
             print("basinhopping step %d: f %g" % (self.nstep, self.energy))
 
-        # initialize storage class
-        self.storage = Storage(self.x, self.energy)
+        jac = None
+        hess = None
 
         if hasattr(minres, "jac"):
-            self.res.jac = minres.jac
+            jac = minres.jac
         if hasattr(minres, "hess"):
-            self.res.hess = minres.hess
+            hess = minres.hess
+
+        # initialize storage class
+        self.storage = Storage(self.x, self.energy, jac, hess)
+
         if hasattr(minres, "nfev"):
             self.res.nfev = minres.nfev
         if hasattr(minres, "njev"):
@@ -118,10 +133,14 @@ class BasinHoppingRunner(object):
             self.res.njev += minres.njev
         if hasattr(minres, "nhev"):
             self.res.nhev += minres.nhev
+
+        jac = None
+        hess = None
+
         if hasattr(minres, "jac"):
-            self.res.jac = minres.jac
+            jac = minres.jac
         if hasattr(minres, "hess"):
-            self.res.hess = minres.hess
+            hess = minres.hess
 
         # accept the move based on self.accept_tests. If any test is false,
         # than reject the step.  If any test returns the special value, the
@@ -153,7 +172,7 @@ class BasinHoppingRunner(object):
                                     x_new=x_after_quench, f_old=self.energy,
                                     x_old=self.x)
 
-        return x_after_quench, energy_after_quench, accept
+        return x_after_quench, energy_after_quench, accept, jac, hess
 
     def one_cycle(self):
         """Do one cycle of the basinhopping algorithm
@@ -161,12 +180,12 @@ class BasinHoppingRunner(object):
         self.nstep += 1
         new_global_min = False
 
-        xtrial, energy_trial, accept = self._monte_carlo_step()
+        xtrial, energy_trial, accept, jac, hess = self._monte_carlo_step()
 
         if accept:
             self.energy = energy_trial
             self.x = np.copy(xtrial)
-            new_global_min = self.storage.update(self.x, self.energy)
+            new_global_min = self.storage.update(self.x, self.energy, jac, hess)
 
         # print some information
         if self.disp:
@@ -184,7 +203,7 @@ class BasinHoppingRunner(object):
 
     def print_report(self, energy_trial, accept):
         """print a status update"""
-        xlowest, energy_lowest = self.storage.get_lowest()
+        xlowest, energy_lowest, _, _ = self.storage.get_lowest()
         print("basinhopping step %d: f %g trial_f %g accepted %d "
               " lowest_f %g" % (self.nstep, self.energy, energy_trial,
                                 accept, energy_lowest))
@@ -642,6 +661,13 @@ def basinhopping(func, x0, niter=100, T=1.0, stepsize=0.5,
     res = bh.res
     res.x = np.copy(lowest[0])
     res.fun = lowest[1]
+
+    if (lowest[2] is not None):
+        res.jac = np.copy(lowest[2])
+
+    if (lowest[3] is not None):
+        res.hess = np.copy(lowest[3])
+
     res.message = message
     res.nit = i + 1
     return res
